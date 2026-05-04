@@ -3,32 +3,28 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SAGEN // ARG CIPHER CONSOLE</title>
+  <title>SAGEN // SECURE CIPHER CONSOLE</title>
   <style>
-    :root{--bg:#05060a;--panel:#0a0d16;--line:#8ca1ff;--text:#f2f5ff;--muted:#9eb0d8}
-    *{box-sizing:border-box} body{margin:0;font-family:Pretendard,"Noto Sans KR",sans-serif;background:radial-gradient(circle at top,#121b43,#05060a 60%);color:var(--text)}
-    .app{max-width:980px;margin:24px auto;padding:16px}
-    h1{letter-spacing:.08em;margin:0 0 6px}.sub{margin:0 0 14px;color:var(--muted)}
+    :root{--panel:#0a0d16;--line:#8ca1ff;--text:#f2f5ff;--muted:#9eb0d8}
+    *{box-sizing:border-box}body{margin:0;font-family:Pretendard,"Noto Sans KR",sans-serif;background:radial-gradient(circle at top,#121b43,#05060a 60%);color:var(--text)}
+    .app{max-width:980px;margin:24px auto;padding:16px}.sub{color:var(--muted)}
     .panel{background:var(--panel);border:2px solid var(--line);border-radius:18px;padding:16px}
     textarea,input{width:100%;background:#03050f;color:#fff;border:1px solid #5f6aa7;border-radius:10px;padding:10px}
-    textarea{min-height:90px} .row{margin-top:10px} .btns{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
-    button{border:none;border-radius:12px;background:#6b7cff;color:#fff;padding:10px 16px;cursor:pointer}
-    button.secondary{background:#293057}
-    .key-slots{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}.slot{width:42px;height:52px;border-radius:12px;background:#f0f0f4;color:#222;display:grid;place-items:center;font-weight:700}
-    canvas{width:100%;margin-top:8px;background:#020308;border-radius:12px;border:1px solid #596bcb}
-    .hint{font-size:13px;color:#9aa9d0;margin-top:8px}
+    textarea{min-height:100px}.row{margin-top:10px}.btns{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+    button{border:none;border-radius:12px;background:#6b7cff;color:#fff;padding:10px 16px;cursor:pointer}button.secondary{background:#293057}
+    .status{font-size:13px;color:#a9b7de;min-height:18px}.ok{color:#72e4a4}.err{color:#ff8a8a}
   </style>
 </head>
 <body>
   <main class="app">
-    <h1>SAGEN // ARG CIPHER CONSOLE</h1>
-    <p class="sub">단일 HTML 버전 · 키워드 슬롯 + 암호 비주얼 + ARG 파일 힌트 연동</p>
+    <h1>SAGEN // SECURE CIPHER CONSOLE</h1>
+    <p class="sub">AES-GCM + PBKDF2 기반 실제 암호화</p>
     <section class="panel">
-      <label for="plain">원문 또는 암호문</label>
-      <textarea id="plain" placeholder="예) turn crank"></textarea>
+      <label for="plain">원문 / 복호화 대상(base64 payload)</label>
+      <textarea id="plain" placeholder="암호화할 평문 또는 복호화할 base64 문자열"></textarea>
       <div class="row">
-        <label for="keyword">키워드(영문)</label>
-        <input id="keyword" type="text" value="KILP" maxlength="16" />
+        <label for="password">비밀번호</label>
+        <input id="password" type="password" placeholder="강한 비밀번호 입력" />
       </div>
       <div class="btns">
         <button id="encryptBtn">암호화</button>
@@ -37,22 +33,46 @@
       </div>
       <label for="result">결과</label>
       <textarea id="result" readonly></textarea>
-      <div class="key-slots" id="keySlots"></div>
-      <canvas id="rain" width="920" height="320"></canvas>
-      <div class="hint">힌트: <code>arg/</code> 폴더 파일들을 조합하면 숨은 키워드 문장이 나옵니다.</div>
+      <p id="status" class="status"></p>
     </section>
   </main>
 <script>
-const plain=document.getElementById('plain'),keyword=document.getElementById('keyword'),result=document.getElementById('result'),slots=document.getElementById('keySlots');
-function normalizeKey(){const key=keyword.value.toUpperCase().replace(/[^A-Z]/g,'');keyword.value=key||'KILP';renderSlots(keyword.value);return keyword.value}
-function vigenere(text,key,dir=1){let out='',i=0;for(const ch of text){const code=ch.charCodeAt(0);if(code>=65&&code<=90){const s=key.charCodeAt(i%key.length)-65;out+=String.fromCharCode(((code-65+dir*s+26)%26)+65);i++}else if(code>=97&&code<=122){const s=key.charCodeAt(i%key.length)-65;out+=String.fromCharCode(((code-97+dir*s+26)%26)+97);i++}else out+=ch;}return out}
-function renderSlots(key){slots.innerHTML='';[...key.slice(0,8)].forEach(c=>{const d=document.createElement('div');d.className='slot';d.textContent=c;slots.appendChild(d)})}
-document.getElementById('encryptBtn').onclick=()=>{const key=normalizeKey();result.value=vigenere(plain.value,key,1)};
-document.getElementById('decryptBtn').onclick=()=>{const key=normalizeKey();result.value=vigenere(plain.value,key,-1)};
-document.getElementById('copyBtn').onclick=async()=>navigator.clipboard.writeText(result.value);
-normalizeKey();
-const canvas=document.getElementById('rain');const ctx=canvas.getContext('2d');const cols=140;const drops=Array(cols).fill(0);
-(function rain(){ctx.fillStyle='rgba(2,3,8,.15)';ctx.fillRect(0,0,canvas.width,canvas.height);for(let i=0;i<cols;i++){const x=i*canvas.width/cols,h=4+Math.random()*16,y=drops[i];ctx.fillStyle=['#3950ff','#6be8ff','#9f8dff','#fff'][Math.floor(Math.random()*4)];ctx.fillRect(x,y,3,h);drops[i]=y>canvas.height?-20:y+h+Math.random()*8}requestAnimationFrame(rain)})();
+const $=(id)=>document.getElementById(id);
+const enc=new TextEncoder(),dec=new TextDecoder();
+function setStatus(msg,type=''){const el=$('status');el.className='status '+type;el.textContent=msg;}
+function toB64(bytes){let bin='';bytes.forEach(b=>bin+=String.fromCharCode(b));return btoa(bin);}
+function fromB64(s){const bin=atob(s);return Uint8Array.from(bin,c=>c.charCodeAt(0));}
+async function deriveKey(password,salt){
+  const material=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:210000,hash:'SHA-256'},material,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+async function encryptText(plain,password){
+  const salt=crypto.getRandomValues(new Uint8Array(16));
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const key=await deriveKey(password,salt);
+  const cipherBuf=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(plain));
+  const cipher=new Uint8Array(cipherBuf);
+  const out=new Uint8Array(1+salt.length+iv.length+cipher.length);
+  out[0]=1; out.set(salt,1); out.set(iv,17); out.set(cipher,29);
+  return toB64(out);
+}
+async function decryptText(payload,password){
+  const packed=fromB64(payload.trim());
+  if(packed.length<30||packed[0]!==1) throw new Error('잘못된 payload 형식');
+  const salt=packed.slice(1,17), iv=packed.slice(17,29), cipher=packed.slice(29);
+  const key=await deriveKey(password,salt);
+  const plainBuf=await crypto.subtle.decrypt({name:'AES-GCM',iv},key,cipher);
+  return dec.decode(plainBuf);
+}
+$('encryptBtn').onclick=async()=>{
+  try{const plain=$('plain').value,pw=$('password').value;if(!pw) throw new Error('비밀번호를 입력하세요');$('result').value=await encryptText(plain,pw);setStatus('암호화 완료','ok');}
+  catch(e){setStatus(e.message,'err');}
+};
+$('decryptBtn').onclick=async()=>{
+  try{const data=$('plain').value,pw=$('password').value;if(!pw) throw new Error('비밀번호를 입력하세요');$('result').value=await decryptText(data,pw);setStatus('복호화 완료','ok');}
+  catch(e){setStatus('복호화 실패: 비밀번호/데이터를 확인하세요.','err');}
+};
+$('copyBtn').onclick=async()=>{try{await navigator.clipboard.writeText($('result').value);setStatus('결과를 복사했습니다.','ok')}catch{setStatus('클립보드 복사 실패','err')}};
 </script>
 </body>
 </html>
