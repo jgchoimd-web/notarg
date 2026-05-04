@@ -19,16 +19,11 @@
 <body>
   <main class="app">
     <h1>SAGEN STYLE IMAGE CIPHER</h1>
-    <p class="sub">입력값 + 패스프레이즈를 해시해서 동일한 패턴 이미지를 생성합니다.</p>
+    <p class="sub">입력 한 개로 실시간 패턴 이미지를 생성합니다.</p>
     <section class="panel">
-      <label for="plain">입력 문장</label>
+      <label for="plain">입력 문장 (단일 입력)</label>
       <textarea id="plain" placeholder="예) turn crank"></textarea>
-      <div class="row">
-        <label for="password">패스프레이즈</label>
-        <input id="password" type="password" placeholder="예) KILP" />
-      </div>
       <div class="btns">
-        <button id="renderBtn">이미지 생성</button>
         <button id="downloadBtn" class="secondary">PNG 저장</button>
       </div>
       <canvas id="art" width="960" height="540"></canvas>
@@ -37,18 +32,27 @@
   </main>
 <script>
 const $=(id)=>document.getElementById(id);
-const canvas=$('art'),ctx=canvas.getContext('2d');
+const canvas=$('art'),ctx=canvas.getContext('2d',{alpha:false});
 const enc=new TextEncoder();
 function setStatus(msg){$('status').textContent=msg;}
 function u32(n){return n>>>0;}
 function rngFactory(seed){let x=u32(seed||1);return()=>{x^=x<<13;x^=x>>>17;x^=x<<5;return u32(x)/4294967296;};}
-async function seedFrom(input,pass){
-  const raw=enc.encode(`${pass}::${input}`);
+async function seedFrom(input){
+  const raw=enc.encode(input);
   const digest=await crypto.subtle.digest('SHA-256',raw);
   const d=new DataView(digest);
   return [d.getUint32(0),d.getUint32(4),d.getUint32(8),d.getUint32(12)];
 }
+function resizeCanvas(){
+  const dpr=Math.max(1,window.devicePixelRatio||1);
+  const w=Math.floor(canvas.clientWidth*dpr);
+  const h=Math.floor((canvas.clientWidth*9/16)*dpr);
+  if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}
+  ctx.imageSmoothingEnabled=false;
+}
+
 function draw(seedWords){
+  resizeCanvas();
   const [a,b,c,d]=seedWords;
   const rand=rngFactory(a^b^c^d);
   ctx.fillStyle='#01030b'; ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -74,7 +78,7 @@ function draw(seedWords){
   ctx.globalAlpha=1;
 
   for(let i=0;i<220;i++){
-    const x=rand()*canvas.width,y=rand()*canvas.height,r=rand()*1.8;
+    const x=Math.floor(rand()*canvas.width),y=Math.floor(rand()*canvas.height),r=Math.max(1,Math.floor(rand()*2));
     ctx.fillStyle=`rgba(255,255,255,${0.1+rand()*0.6})`;
     ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
   }
@@ -85,14 +89,29 @@ function draw(seedWords){
   ctx.fillText(sig,canvas.width-160,canvas.height-18);
 }
 
-$('renderBtn').onclick=async()=>{
+
+let raf=0;
+async function renderLive(){
   const input=$('plain').value.trim();
-  const pass=$('password').value;
-  if(!input||!pass){setStatus('입력 문장과 패스프레이즈를 모두 넣어주세요.');return;}
-  const seed=await seedFrom(input,pass);
+  if(!input){
+    resizeCanvas();
+    ctx.fillStyle='#05060a';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    setStatus('실시간 대기 중: 입력 문장을 넣어주세요.');
+    return;
+  }
+  const seed=await seedFrom(input);
   draw(seed);
-  setStatus('생성 완료: 같은 입력/패스프레이즈는 같은 이미지를 생성합니다.');
-};
+  setStatus('실시간 생성 중 (픽셀 정렬 적용).');
+}
+function scheduleRender(){
+  cancelAnimationFrame(raf);
+  raf=requestAnimationFrame(()=>{renderLive();});
+}
+['plain'].forEach(id=>$(id).addEventListener('input',scheduleRender));
+window.addEventListener('resize',scheduleRender);
+scheduleRender();
+
 $('downloadBtn').onclick=()=>{
   const a=document.createElement('a');
   a.href=canvas.toDataURL('image/png');
