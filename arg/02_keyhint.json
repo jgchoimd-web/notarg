@@ -1,0 +1,6 @@
+{
+  "stage": 2,
+  "mask": "K _ L P",
+  "msg": "default key still works, but not final",
+  "next": "decode packets, then use console"
+}
