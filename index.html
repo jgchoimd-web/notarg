@@ -3,76 +3,102 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SAGEN // SECURE CIPHER CONSOLE</title>
+  <title>SAGEN STYLE IMAGE CIPHER</title>
   <style>
     :root{--panel:#0a0d16;--line:#8ca1ff;--text:#f2f5ff;--muted:#9eb0d8}
     *{box-sizing:border-box}body{margin:0;font-family:Pretendard,"Noto Sans KR",sans-serif;background:radial-gradient(circle at top,#121b43,#05060a 60%);color:var(--text)}
-    .app{max-width:980px;margin:24px auto;padding:16px}.sub{color:var(--muted)}
+    .app{max-width:1000px;margin:24px auto;padding:16px}.sub{color:var(--muted)}
     .panel{background:var(--panel);border:2px solid var(--line);border-radius:18px;padding:16px}
     textarea,input{width:100%;background:#03050f;color:#fff;border:1px solid #5f6aa7;border-radius:10px;padding:10px}
-    textarea{min-height:100px}.row{margin-top:10px}.btns{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+    textarea{min-height:90px}.row{margin-top:10px}.btns{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
     button{border:none;border-radius:12px;background:#6b7cff;color:#fff;padding:10px 16px;cursor:pointer}button.secondary{background:#293057}
-    .status{font-size:13px;color:#a9b7de;min-height:18px}.ok{color:#72e4a4}.err{color:#ff8a8a}
+    canvas{width:100%;display:block;background:#020308;border-radius:12px;border:1px solid #596bcb}
+    .status{font-size:13px;color:#a9b7de;min-height:18px;margin-top:8px}
   </style>
 </head>
 <body>
   <main class="app">
-    <h1>SAGEN // SECURE CIPHER CONSOLE</h1>
-    <p class="sub">AES-GCM + PBKDF2 기반 실제 암호화</p>
+    <h1>SAGEN STYLE IMAGE CIPHER</h1>
+    <p class="sub">입력값 + 패스프레이즈를 해시해서 동일한 패턴 이미지를 생성합니다.</p>
     <section class="panel">
-      <label for="plain">원문 / 복호화 대상(base64 payload)</label>
-      <textarea id="plain" placeholder="암호화할 평문 또는 복호화할 base64 문자열"></textarea>
+      <label for="plain">입력 문장</label>
+      <textarea id="plain" placeholder="예) turn crank"></textarea>
       <div class="row">
-        <label for="password">비밀번호</label>
-        <input id="password" type="password" placeholder="강한 비밀번호 입력" />
+        <label for="password">패스프레이즈</label>
+        <input id="password" type="password" placeholder="예) KILP" />
       </div>
       <div class="btns">
-        <button id="encryptBtn">암호화</button>
-        <button id="decryptBtn" class="secondary">복호화</button>
-        <button id="copyBtn" class="secondary">결과 복사</button>
+        <button id="renderBtn">이미지 생성</button>
+        <button id="downloadBtn" class="secondary">PNG 저장</button>
       </div>
-      <label for="result">결과</label>
-      <textarea id="result" readonly></textarea>
-      <p id="status" class="status"></p>
+      <canvas id="art" width="960" height="540"></canvas>
+      <p class="status" id="status"></p>
     </section>
   </main>
 <script>
 const $=(id)=>document.getElementById(id);
-const enc=new TextEncoder(),dec=new TextDecoder();
-function setStatus(msg,type=''){const el=$('status');el.className='status '+type;el.textContent=msg;}
-function toB64(bytes){let bin='';bytes.forEach(b=>bin+=String.fromCharCode(b));return btoa(bin);}
-function fromB64(s){const bin=atob(s);return Uint8Array.from(bin,c=>c.charCodeAt(0));}
-async function deriveKey(password,salt){
-  const material=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveKey']);
-  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:210000,hash:'SHA-256'},material,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+const canvas=$('art'),ctx=canvas.getContext('2d');
+const enc=new TextEncoder();
+function setStatus(msg){$('status').textContent=msg;}
+function u32(n){return n>>>0;}
+function rngFactory(seed){let x=u32(seed||1);return()=>{x^=x<<13;x^=x>>>17;x^=x<<5;return u32(x)/4294967296;};}
+async function seedFrom(input,pass){
+  const raw=enc.encode(`${pass}::${input}`);
+  const digest=await crypto.subtle.digest('SHA-256',raw);
+  const d=new DataView(digest);
+  return [d.getUint32(0),d.getUint32(4),d.getUint32(8),d.getUint32(12)];
 }
-async function encryptText(plain,password){
-  const salt=crypto.getRandomValues(new Uint8Array(16));
-  const iv=crypto.getRandomValues(new Uint8Array(12));
-  const key=await deriveKey(password,salt);
-  const cipherBuf=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(plain));
-  const cipher=new Uint8Array(cipherBuf);
-  const out=new Uint8Array(1+salt.length+iv.length+cipher.length);
-  out[0]=1; out.set(salt,1); out.set(iv,17); out.set(cipher,29);
-  return toB64(out);
+function draw(seedWords){
+  const [a,b,c,d]=seedWords;
+  const rand=rngFactory(a^b^c^d);
+  ctx.fillStyle='#01030b'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  const grad=ctx.createLinearGradient(0,0,0,canvas.height);
+  grad.addColorStop(0,'rgba(45,70,255,.18)'); grad.addColorStop(1,'rgba(0,0,0,.04)');
+  ctx.fillStyle=grad; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  const bars=140+Math.floor(rand()*120);
+  for(let i=0;i<bars;i++){
+    const x=Math.floor(rand()*canvas.width);
+    const w=1+Math.floor(rand()*4);
+    let y=-Math.floor(rand()*80);
+    while(y<canvas.height){
+      const h=4+Math.floor(rand()*36);
+      const pick=Math.floor(rand()*6);
+      const color=['#2a43ff','#5fdfff','#8b7cff','#ffffff','#3b7fff','#ff9bf1'][pick];
+      ctx.fillStyle=color;
+      ctx.globalAlpha=.2+rand()*.8;
+      ctx.fillRect(x,y,w,h);
+      y+=h+Math.floor(rand()*16);
+    }
+  }
+  ctx.globalAlpha=1;
+
+  for(let i=0;i<220;i++){
+    const x=rand()*canvas.width,y=rand()*canvas.height,r=rand()*1.8;
+    ctx.fillStyle=`rgba(255,255,255,${0.1+rand()*0.6})`;
+    ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+  }
+
+  const sig=`SIG-${(a^c).toString(16).slice(0,6).toUpperCase()}`;
+  ctx.fillStyle='rgba(240,245,255,.9)';
+  ctx.font='bold 18px monospace';
+  ctx.fillText(sig,canvas.width-160,canvas.height-18);
 }
-async function decryptText(payload,password){
-  const packed=fromB64(payload.trim());
-  if(packed.length<30||packed[0]!==1) throw new Error('잘못된 payload 형식');
-  const salt=packed.slice(1,17), iv=packed.slice(17,29), cipher=packed.slice(29);
-  const key=await deriveKey(password,salt);
-  const plainBuf=await crypto.subtle.decrypt({name:'AES-GCM',iv},key,cipher);
-  return dec.decode(plainBuf);
-}
-$('encryptBtn').onclick=async()=>{
-  try{const plain=$('plain').value,pw=$('password').value;if(!pw) throw new Error('비밀번호를 입력하세요');$('result').value=await encryptText(plain,pw);setStatus('암호화 완료','ok');}
-  catch(e){setStatus(e.message,'err');}
+
+$('renderBtn').onclick=async()=>{
+  const input=$('plain').value.trim();
+  const pass=$('password').value;
+  if(!input||!pass){setStatus('입력 문장과 패스프레이즈를 모두 넣어주세요.');return;}
+  const seed=await seedFrom(input,pass);
+  draw(seed);
+  setStatus('생성 완료: 같은 입력/패스프레이즈는 같은 이미지를 생성합니다.');
 };
-$('decryptBtn').onclick=async()=>{
-  try{const data=$('plain').value,pw=$('password').value;if(!pw) throw new Error('비밀번호를 입력하세요');$('result').value=await decryptText(data,pw);setStatus('복호화 완료','ok');}
-  catch(e){setStatus('복호화 실패: 비밀번호/데이터를 확인하세요.','err');}
+$('downloadBtn').onclick=()=>{
+  const a=document.createElement('a');
+  a.href=canvas.toDataURL('image/png');
+  a.download='sagen-cipher-image.png';
+  a.click();
 };
-$('copyBtn').onclick=async()=>{try{await navigator.clipboard.writeText($('result').value);setStatus('결과를 복사했습니다.','ok')}catch{setStatus('클립보드 복사 실패','err')}};
 </script>
 </body>
 </html>
