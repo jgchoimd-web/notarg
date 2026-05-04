@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>사젠 스타일 암호화</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app">
+    <h1>사젠 스타일 암호화</h1>
+    <p class="sub">문장을 입력하면 키워드와 함께 암호문으로 바꿔요.</p>
+
+    <section class="panel">
+      <label for="plain">원문</label>
+      <textarea id="plain" placeholder="예) secret stage code"></textarea>
+
+      <div class="row">
+        <label for="keyword">키워드(영문)</label>
+        <input id="keyword" type="text" value="KILP" maxlength="16" />
+      </div>
+
+      <div class="btns">
+        <button id="encryptBtn">암호화</button>
+        <button id="decryptBtn" class="secondary">복호화</button>
+        <button id="copyBtn" class="secondary">결과 복사</button>
+      </div>
+
+      <label for="result">결과</label>
+      <textarea id="result" readonly></textarea>
+
+      <div class="key-slots" id="keySlots"></div>
+      <canvas id="rain" width="860" height="320" aria-label="암호 배경 애니메이션"></canvas>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
